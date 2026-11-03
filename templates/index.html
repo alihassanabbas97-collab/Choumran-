@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Choumran — كشف الاحتيال بالتحويلات المالية</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo">◆</span>
+    <div>
+      <h1>Choumran</h1>
+      <small>كشف الاحتيال والنصب بالتحويلات المالية</small>
+    </div>
+  </div>
+  <div id="current-dataset" class="dataset hidden"></div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="upload" class="active">① البيانات</button>
+  <button data-tab="dashboard" disabled>② اللوحة</button>
+  <button data-tab="transactions" disabled>③ العمليات</button>
+  <button data-tab="mapping" disabled>④ الربط</button>
+  <button data-tab="model" disabled>⑤ النموذج</button>
+</nav>
+
+<main>
+  <!-- ============================ UPLOAD ============================ -->
+  <section id="tab-upload" class="tab active">
+    <div class="grid two">
+      <div class="card">
+        <h2>جرّب على بيانات تجريبية</h2>
+        <p class="muted">منولّد تحويلات وهمية بين أشخاص ومحلات، وفيها حالات احتيال ونصب مخفية، والنظام بيحاول يكشفها.</p>
+        <div class="form-row">
+          <label>عدد الأشخاص <input type="number" id="demo-persons" value="300" min="30" max="1500"></label>
+          <label>عدد الأيام <input type="number" id="demo-days" value="60" min="14" max="365"></label>
+        </div>
+        <button class="btn primary" id="btn-demo">ولّد وحلّل</button>
+        <a class="btn ghost" href="/api/sample.csv">⬇ نزّل ملف نموذجي CSV</a>
+      </div>
+
+      <div class="card">
+        <h2>ارفع بياناتك</h2>
+        <p class="muted">ملف CSV أو Excel. البيانات بتنقرا بالذاكرة بس، وما بتنحفظ على السيرفر.</p>
+        <label class="drop" id="drop">
+          <input type="file" id="file" accept=".csv,.txt,.xlsx,.xls">
+          <span id="drop-text">اضغط لتختار ملف أو اسحبه لهون</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="card hidden" id="mapping-card">
+      <h2>ربط الأعمدة</h2>
+      <p class="muted">اختار شو بيقابل كل حقل من أعمدة ملفك. الحقول اللي عليها <b>*</b> إجبارية.</p>
+      <div id="col-map" class="col-map"></div>
+      <details class="preview"><summary>معاينة أول 5 أسطر</summary><div id="preview" class="table-wrap"></div></details>
+      <div class="options">
+        <label class="check"><input type="checkbox" id="opt-train"> درّب نموذج جديد على تصنيفات ملفي (لازم عمود label)</label>
+        <label class="check hidden" id="opt-custom-wrap"><input type="checkbox" id="opt-custom"> استعمل آخر نموذج دربته</label>
+      </div>
+      <button class="btn primary" id="btn-analyze">حلّل الملف</button>
+    </div>
+
+    <div class="card">
+      <h2>شو لازم يكون بالملف؟</h2>
+      <div id="schema-help" class="schema"></div>
+    </div>
+  </section>
+
+  <!-- ============================ DASHBOARD ============================ -->
+  <section id="tab-dashboard" class="tab">
+    <div class="kpis" id="kpis"></div>
+    <div class="card threshold">
+      <label>حد الاشتباه (T/F): <b id="thr-val">0.50</b>
+        <input type="range" id="thr" min="0.05" max="0.95" step="0.05" value="0.5">
+      </label>
+      <small class="muted">أي عملية احتمال إنها احتيال أو نصب أعلى من هالحد بتتعلّم مشبوهة. إذا نزّلته بتكشف أكتر بس بيكتر الإنذار الغلط.</small>
+    </div>
+    <div class="grid two">
+      <div class="card"><h3>توزيع العمليات</h3><div class="chart-box"><canvas id="ch-class"></canvas></div></div>
+      <div class="card"><h3>المحلات/الحسابات الأخطر</h3><div class="chart-box"><canvas id="ch-top"></canvas></div></div>
+      <div class="card span2"><h3>العمليات باليوم</h3><div class="chart-box"><canvas id="ch-day"></canvas></div></div>
+      <div class="card"><h3>حسب ساعة النهار</h3><div class="chart-box"><canvas id="ch-hour"></canvas></div></div>
+      <div class="card"><h3>حسب المبلغ</h3><div class="chart-box"><canvas id="ch-amount"></canvas></div></div>
+    </div>
+  </section>
+
+  <!-- ============================ TRANSACTIONS ============================ -->
+  <section id="tab-transactions" class="tab">
+    <div class="card">
+      <div class="filters">
+        <select id="tx-cls">
+          <option value="suspicious">المشبوهة بس</option>
+          <option value="">الكل</option>
+          <option value="fraud">احتيال</option>
+          <option value="scam">نصب</option>
+          <option value="ordinary">عادية</option>
+        </select>
+        <select id="tx-sort">
+          <option value="risk">الأخطر أولاً</option>
+          <option value="time">الأحدث أولاً</option>
+          <option value="amount">الأكبر مبلغاً</option>
+        </select>
+        <input type="search" id="tx-q" placeholder="بحث بالاسم أو الرقم...">
+        <a class="btn ghost small" id="tx-export">⬇ تصدير CSV</a>
+      </div>
+      <div id="tx-entity-filter" class="chip hidden"></div>
+      <div class="table-wrap"><table id="tx-table" class="data"></table></div>
+      <div class="pager" id="tx-pager"></div>
+    </div>
+  </section>
+
+  <!-- ============================ MAPPING ============================ -->
+  <section id="tab-mapping" class="tab">
+    <div class="card">
+      <div class="filters">
+        <select id="g-mode">
+          <option value="suspicious">الشبكة المشبوهة بس</option>
+          <option value="all">كل الشبكة</option>
+        </select>
+        <input type="search" id="g-q" placeholder="ركّز على شخص أو محل...">
+        <button class="btn ghost small" id="g-reset">رجوع للكل</button>
+      </div>
+      <div class="legend">
+        <span><i class="dot person"></i>شخص</span>
+        <span><i class="sq shop"></i>محل</span>
+        <span><i class="dot high"></i>خطر عالي</span>
+        <span><i class="dot medium"></i>متوسط</span>
+        <span><i class="line scam"></i>نصب</span>
+        <span><i class="line fraud"></i>احتيال</span>
+      </div>
+      <div id="graph"></div>
+      <small class="muted" id="g-note"></small>
+    </div>
+    <div class="grid two">
+      <div class="card" id="entity-panel"><p class="muted">اضغط على أي شخص أو محل بالشبكة أو بالجدول لتشوف تفاصيله.</p></div>
+      <div class="card">
+        <div class="filters">
+          <select id="e-type"><option value="">أشخاص ومحلات</option><option value="person">أشخاص</option><option value="shop">محلات</option></select>
+          <select id="e-level"><option value="">كل المستويات</option><option value="high">خطر عالي</option><option value="medium">متوسط</option><option value="low">منخفض</option></select>
+          <a class="btn ghost small" id="e-export">⬇ CSV</a>
+        </div>
+        <div class="table-wrap tall"><table id="e-table" class="data"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ MODEL ============================ -->
+  <section id="tab-model" class="tab">
+    <div class="grid two">
+      <div class="card"><h3>شو الأنماط اللي تعلّمها النموذج؟</h3><div class="chart-box tall"><canvas id="ch-imp"></canvas></div></div>
+      <div class="card" id="model-info"></div>
+    </div>
+    <div class="card" id="eval-card"></div>
+  </section>
+</main>
+
+<div id="loading" class="loading hidden"><div class="spinner"></div><p id="loading-text">عم نحلّل...</p></div>
+<div id="toast" class="toast hidden"></div>
+
+<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/vis-network.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
