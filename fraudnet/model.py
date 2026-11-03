@@ -14,7 +14,7 @@ from sklearn.model_selection import train_test_split
 
 from .features import FEATURES, build_features
 from .generator import generate_transactions
-from .schema import LABELS
+from .schema import LABELS, SchemaError
 
 MODEL_DIR = Path(__file__).resolve().parent.parent / "models"
 DEFAULT_MODEL_PATH = MODEL_DIR / "default_model.joblib"
@@ -76,12 +76,12 @@ def evaluate(y_true: pd.Series, y_pred: pd.Series) -> dict:
 def train(df: pd.DataFrame, source: str, test_size: float = 0.3, seed: int = 7) -> TrainedModel:
     """Train on a labelled, normalised frame; report metrics on a held-out split."""
     if "label" not in df:
-        raise ValueError("training data needs a label column")
+        raise SchemaError("train_needs_label")
     feats = build_features(df).loc[df.index]
     y = df["label"]
     counts = y.value_counts()
     if len(counts) < 2:
-        raise ValueError("التدريب بدو على الأقل نوعين من التصنيفات (مثلاً عادية واحتيال)")
+        raise SchemaError("train_two_classes")
     stratify = y if counts.min() >= 2 else None
     X_tr, X_te, y_tr, y_te = train_test_split(feats, y, test_size=test_size, random_state=seed, stratify=stratify)
     clf = _new_clf().fit(X_tr, y_tr)

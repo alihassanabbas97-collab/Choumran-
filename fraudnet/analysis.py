@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
-from .features import FEATURE_AR, build_features
+from .features import build_features
 from .model import TrainedModel, evaluate
 from .schema import LABELS
 
@@ -45,16 +45,16 @@ def run(df: pd.DataFrame, model: TrainedModel, threshold: float = 0.5) -> Analys
 
 
 def _reasons(feats: pd.DataFrame, out: pd.DataFrame) -> list[str]:
-    """Short human-readable explanation for suspicious transactions."""
+    """Reason codes (``|``-separated, translated via ``reason.<code>``) for suspicious rows."""
     rules = [
-        (feats["is_night"] == 1, "بالليل"),
-        (feats["new_device_for_sender"] == 1, "جهاز جديد"),
-        (feats["new_city_for_sender"] == 1, "مدينة جديدة"),
-        (feats["amount_vs_sender_avg"] >= 4, "مبلغ أعلى بكتير من العادة"),
-        (feats["sender_tx_24h"] >= 4, "عمليات كتير ورا بعض"),
-        (feats["new_receiver_for_sender"] == 1, "أول مرة يدفع لهالمستلم"),
-        (feats["is_round_amount"] == 1, "مبلغ مدوّر"),
-        ((feats["receiver_age_days"] < 10) & (feats["receiver_unique_senders"] >= 5), "مستلم جديد عم يجمع مصاري من ناس كتير"),
+        (feats["is_night"] == 1, "night"),
+        (feats["new_device_for_sender"] == 1, "new_device"),
+        (feats["new_city_for_sender"] == 1, "new_city"),
+        (feats["amount_vs_sender_avg"] >= 4, "high_amount"),
+        (feats["sender_tx_24h"] >= 4, "burst"),
+        (feats["new_receiver_for_sender"] == 1, "new_receiver"),
+        (feats["is_round_amount"] == 1, "round_amount"),
+        ((feats["receiver_age_days"] < 10) & (feats["receiver_unique_senders"] >= 5), "new_collector"),
     ]
     res = []
     sus = out["suspicious"].to_numpy()
@@ -63,7 +63,7 @@ def _reasons(feats: pd.DataFrame, out: pd.DataFrame) -> list[str]:
         if not sus[i]:
             res.append("")
             continue
-        res.append("، ".join(txt for m, txt in masks if m[i]))
+        res.append("|".join(txt for m, txt in masks if m[i]))
     return res
 
 
@@ -115,16 +115,17 @@ def _entities(df: pd.DataFrame) -> pd.DataFrame:
     ent["risk_level"] = ent["risk_score"].map(_risk_level)
 
     def role(row) -> str:
+        """Role code, translated via ``role.<code>``."""
         if row["scam_recv"] >= 3 or (row["recv_count"] and row["scam_recv"] / row["recv_count"] > 0.3):
-            return "مشتبه بالنصب (عم يجمع مصاري من ضحايا)"
+            return "scam_suspect"
         if row["fraud_recv"] >= 3 and row["type"] == "shop":
-            return "محل استُعمل كتير بعمليات احتيال"
+            return "fraud_shop"
         if row["fraud_sent"] > 0:
-            return "حساب ممكن يكون مسروق (ضحية احتيال)"
+            return "compromised"
         if row["scam_sent"] > 0:
-            return "ممكن يكون ضحية نصب"
+            return "scam_victim"
         if row["fraud_recv"] > 0:
-            return "استلم عملية احتيال"
+            return "fraud_received"
         return ""
 
     ent["role"] = ent.apply(role, axis=1)
@@ -189,10 +190,7 @@ def summary(a: Analysis) -> dict:
              "fraud": int(r["fraud_recv"])}
             for i, r in top_recv.iterrows()
         ],
-        "importances": [
-            {**x, "label": FEATURE_AR.get(x["feature"], x["feature"])}
-            for x in a.model.importances()
-        ],
+        "importances": a.model.importances(),
         "evaluation": a.evaluation,
     }
 
@@ -209,7 +207,11 @@ def tx_records(df: pd.DataFrame) -> list[dict]:
     for c in ("risk", "p_fraud", "p_scam"):
         d[c] = d[c].round(3)
     d = d.astype(object).where(d.notna(), None)
-    return d.to_dict(orient="records")
+    recs = d.to_dict(orient="records")
+    for r in recs:
+        if "reasons" in r:
+            r["reasons"] = [c for c in (r["reasons"] or "").split("|") if c]
+    return recs
 
 
 def transactions(a: Analysis, page: int = 1, per_page: int = 50, cls: str = "",

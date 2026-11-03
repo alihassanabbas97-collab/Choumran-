@@ -118,3 +118,72 @@ def test_api_errors(client):
     up = client.post("/api/upload", data={"file": (buf, "t.csv")}, content_type="multipart/form-data").json
     r = client.post("/api/analyze", json={"token": up["token"], "mapping": up["mapping"]})
     assert r.status_code == 400 and "error" in r.json
+
+
+# ------------------------------------------------------------------ i18n --
+import json
+import re
+from pathlib import Path
+
+from fraudnet.i18n import LANGS, strings, t
+
+I18N = Path(__file__).resolve().parent.parent / "static" / "i18n"
+
+
+def test_translation_files_have_same_keys():
+    keys = {lang: set(json.loads((I18N / f"{lang}.json").read_text(encoding="utf-8"))) for lang in LANGS}
+    for lang in LANGS:
+        assert keys[lang] == keys["en"], lang
+
+
+def test_all_backend_codes_are_translated(small):
+    a = an.run(small, default_model())
+    reasons = {c for r in a.df["reasons"] for c in r.split("|") if c}
+    roles = {r for r in a.entities["role"] if r}
+    assert reasons and roles
+    for lang in LANGS:
+        d = strings(lang)
+        for c in reasons:
+            assert f"reason.{c}" in d
+        for r in roles:
+            assert f"role.{r}" in d
+        for f in FEATURES:
+            assert f"feat.{f}" in d
+
+
+def test_frontend_keys_exist():
+    root = Path(__file__).resolve().parent.parent
+    html = (root / "templates" / "index.html").read_text(encoding="utf-8")
+    keys = set(re.findall(r'data-i18n(?:-html|-placeholder|-aria)?="([^"]+)"', html))
+    js = (root / "static" / "js" / "app.js").read_text(encoding="utf-8")
+    keys |= set(re.findall(r'\bt\("([a-z_]+\.[a-z_.]+)"', js))
+    d = strings("en")
+    assert keys and not [k for k in keys if not k.endswith(".") and k not in d]
+
+
+def test_error_messages_follow_language(client):
+    for lang, word in (("en", "expired"), ("fr", "expirée"), ("ar", "التحليل")):
+        r = client.get(f"/api/a/nope/summary?lang={lang}")
+        assert r.status_code == 404 and word in r.json["error"]
+    buf = io.BytesIO(b"x,y\n1,2\n")
+    up = client.post("/api/upload", data={"file": (buf, "t.csv")}, content_type="multipart/form-data").json
+    r = client.post("/api/analyze", json={"token": up["token"], "mapping": up["mapping"]}, headers={"X-Lang": "fr"})
+    assert r.status_code == 400 and r.json["code"] == "missing_columns" and "Montant" in r.json["error"]
+
+
+def test_generator_locales_same_structure():
+    frames = {loc: generate_transactions(n_persons=40, n_shops=10, days=15, fraud_cases=3, scam_receivers=2, seed=3, locale=loc)
+              for loc in ("en", "ar", "fr")}
+    assert frames["en"]["amount"].equals(frames["ar"]["amount"])
+    assert frames["en"]["label"].equals(frames["fr"]["label"])
+    assert frames["en"]["sender_name"].iloc[0] != frames["ar"]["sender_name"].iloc[0]
+    assert t("fr", "label.scam") == "Arnaque"
+
+
+def test_export_is_translated(client):
+    r = client.post("/api/demo", json={"persons": 40, "days": 15, "seed": 1})
+    aid = r.json["id"]
+    csv_fr = client.get(f"/api/a/{aid}/export.csv?lang=fr").data.decode("utf-8-sig")
+    assert "Normale" in csv_fr
+    ent_ar = client.get(f"/api/a/{aid}/export.csv?what=entities&lang=ar").data.decode("utf-8-sig")
+    assert "شخص" in ent_ar
