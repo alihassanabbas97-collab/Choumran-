@@ -1,69 +1,84 @@
 # Choumran
 
-موقع لكشف **الاحتيال** و**النصب** بالتحويلات المالية باستخدام الذكاء الاصطناعي (Machine Learning)، مع **ربط** بين الأشخاص والمحلات.
+A web app that detects **fraud** and **scams** in money transactions with machine learning, and **maps** the links between persons and shops.
 
-## شو بيعمل؟
+The interface is in **English** by default, and you can switch it to **العربية** (right-to-left) or **Français** from the 🌐 menu. The choice is remembered in the browser.
 
-1. **البيانات الخاصة:** بترفع ملف تحويلات (CSV أو Excel)، أو بتولّد بيانات تجريبية. البيانات بتنقرا بالذاكرة بس، وما بتنحفظ على السيرفر.
-2. **الرفع والتطبيق:** بتربط أعمدة ملفك بالحقول المطلوبة، والنظام بيحسب لكل عملية مؤشرات سلوكية: المبلغ مقارنة بعادة الشخص، الساعة، جهاز أو مدينة جديدة، عمليات كتير ورا بعض، مستلم جديد عم يجمع مصاري من ناس كتير...
-3. **الرسوم والأنماط:** لوحة فيها رسوم بيانية، ونموذج Random Forest بيصنّف كل عملية لواحد من تلات أنواع:
-   - **عادية** (ordinary)
-   - **احتيال** (fraud): حساب أو بطاقة مسروقة، صرف كبير بالليل من جهاز جديد
-   - **نصب** (scam): ضحايا بيدفعوا لمستلم مزيّف
-   - **T/F:** حد اشتباه بتقدر تغيّره، وكل عملية فوقه بتتعلّم مشبوهة
-4. **مقارنة البيانات مع الأنماط:** إذا ملفك فيه عمود تصنيف (`label`)، الموقع بيقارن النتايج فيه (دقة، كشف، مصفوفة الالتباس). وبتقدر كمان تدرّب نموذج جديد على بياناتك.
-5. **دمج المعلومات مع النتايج والربط:** شبكة تفاعلية بين الأشخاص والمحلات. لكل جهة في درجة خطورة ودور، مثلاً "مشتبه بالنصب"، "حساب ممكن يكون مسروق"، "ممكن يكون ضحية نصب".
+## What it does
 
-## التشغيل
+1. **Private data:** upload a transactions file (CSV or Excel), or generate synthetic data. Data is processed in memory only and never saved on the server.
+2. **Upload / implement:** map your file's columns to the expected fields. The app then computes behavioural signals for every transaction:
+   - amount vs. the sender's usual
+   - hour of day
+   - new device or city
+   - bursts of transactions
+   - a new receiver collecting money from many people
+   - …
+3. **Charts and patterns:** a dashboard with charts, plus a Random Forest model that classifies each transaction as:
+   - **ordinary**
+   - **fraud:** stolen account or card, e.g. large night-time spending from a new device
+   - **scam:** victims paying a fake receiver
 
-بدك Python 3.10 أو أحدث.
+   An adjustable **T/F threshold** decides which transactions are flagged as suspicious.
+4. **Compare data with patterns:** if your file has a `label` column, the app compares its results against it (accuracy, recall, confusion matrix). You can also train a new model on your own labels.
+5. **Merge results and map:** an interactive person ↔ shop network. Every entity gets a risk score and a role, such as *scam suspect*, *possibly compromised account* or *possible scam victim*.
+
+## Running it
+
+You need Python 3.10 or newer.
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate        # على Windows: .venv\Scripts\activate
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 python app.py
 ```
 
-بعدين افتح http://127.0.0.1:5000
+Then open http://127.0.0.1:5000
 
-أول مرة بيتدرّب النموذج التجريبي، وبياخد حوالي 15 ثانية. بعدها بينحفظ بمجلد `models/`.
+On the first run the default model trains on synthetic data. This takes about 15 seconds, and the model is then cached in `models/`.
 
-لتفتحه من التلفون على نفس شبكة الـ Wi-Fi: `HOST=0.0.0.0 python app.py` وافتح `http://<IP الكمبيوتر>:5000`.
+To open the app from a phone on the same Wi-Fi network, run `HOST=0.0.0.0 python app.py` and visit `http://<computer-ip>:5000`.
 
-## شكل الملف
+## File format
 
-| العمود | المعنى | |
+| Column | Meaning | |
 |---|---|---|
-| `timestamp` | التاريخ والوقت | إجباري |
-| `sender_id` | رقم المرسل (الشخص) | إجباري |
-| `receiver_id` | رقم المستلم (محل أو شخص) | إجباري |
-| `amount` | المبلغ | إجباري |
-| `transaction_id`, `sender_name`, `receiver_name` | رقم العملية والأسماء | اختياري |
-| `receiver_type` | `shop` أو `person` | اختياري |
-| `device_id`, `city` | الجهاز والمدينة (بيحسّنوا الكشف) | اختياري |
-| `label` | `ordinary` / `fraud` / `scam` | اختياري (للمقارنة أو التدريب) |
+| `timestamp` | Date & time | required |
+| `sender_id` | Sender ID (person) | required |
+| `receiver_id` | Receiver ID (shop or person) | required |
+| `amount` | Amount | required |
+| `transaction_id`, `sender_name`, `receiver_name` | ID and names | optional |
+| `receiver_type` | `shop` or `person` | optional |
+| `device_id`, `city` | Device and location (improve detection) | optional |
+| `label` | `ordinary` / `fraud` / `scam` | optional (comparison / training) |
 
-أسماء الأعمدة ما لازم تكون نفسها، بتربطها من الموقع. وفي ملف نموذجي بتقدر تنزّله من الصفحة الأولى.
+Column names don't have to match: the app guesses common English, French and Arabic names, and you can map the rest by hand. You can download a sample file from the first page.
 
-## ملاحظة مهمة عن الدقة
+## A note on accuracy
 
-النموذج الافتراضي متدرّب على **بيانات تجريبية**، والأنماط فيها واضحة. الأرقام العالية اللي بتطلع عليها ما بتعني إنه رح يكون بنفس الدقة على البيانات الحقيقية. للبيانات الحقيقية، الأفضل:
+The default model is trained on **synthetic data**, where the patterns are clear. The high scores it gets there do **not** mean it will be as accurate on real data. For real data:
 
-- يكون في عمود `label` لعمليات معروفة إنها احتيال أو نصب، وتدرّب عليها
-- تراجع النتايج بإيدك قبل ما تاخد أي قرار بحق شخص أو محل
+- add a `label` column for known fraud and scam cases, and retrain on it
+- review the results manually before acting against any person or shop
 
-**النتايج مؤشرات للمراجعة، مش إثبات.**
+**Results are leads to review, not proof.**
 
-## البنية
+## Translations
+
+All interface text lives in `static/i18n/en.json`, `ar.json` and `fr.json`. The browser and the server (error messages, CSV exports) share these files. To change a wording, edit the matching key. To add a language, copy `en.json`, translate it, and add the code to `LANGS` in `fraudnet/i18n.py` and `static/js/app.js`.
+
+## Project layout
 
 ```
-app.py                 السيرفر (Flask) والـ API
-fraudnet/generator.py  مولّد البيانات التجريبية
-fraudnet/schema.py     قراءة الأعمدة وتنظيف البيانات
-fraudnet/features.py   المؤشرات السلوكية (بتعتمد بس على الماضي)
-fraudnet/model.py      التدريب والتقييم
-fraudnet/analysis.py   التصنيف، درجة خطورة الجهات، والشبكة
-templates/, static/    الواجهة (عربي، مناسبة للتلفون)
-tests/                 الاختبارات: python -m pytest
+app.py                 Flask server and API
+fraudnet/generator.py  synthetic data generator (names per language)
+fraudnet/schema.py     column detection and data cleaning
+fraudnet/features.py   behavioural features (past-only)
+fraudnet/model.py      training and evaluation
+fraudnet/analysis.py   classification, entity risk, network
+fraudnet/i18n.py       server-side translations
+static/i18n/           translation files (en / ar / fr)
+templates/, static/    interface (mobile-friendly, LTR + RTL)
+tests/                 tests: python -m pytest
 ```

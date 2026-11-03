@@ -31,28 +31,6 @@ FEATURES = [
     "amount_vs_receiver_avg",
 ]
 
-FEATURE_AR = {
-    "log_amount": "قيمة المبلغ",
-    "hour": "ساعة العملية",
-    "is_night": "عملية بالليل",
-    "day_of_week": "يوم الأسبوع",
-    "is_round_amount": "مبلغ مدوّر (100، 500...)",
-    "receiver_is_shop": "المستلم محل",
-    "sender_prior_count": "عدد عمليات المرسل السابقة",
-    "amount_vs_sender_avg": "المبلغ مقارنة بمعدل المرسل",
-    "sender_tx_24h": "عمليات المرسل آخر 24 ساعة",
-    "sender_amount_24h_log": "مجموع صرف المرسل آخر 24 ساعة",
-    "minutes_since_sender_prev": "الوقت من آخر عملية للمرسل",
-    "new_receiver_for_sender": "أول مرة يدفع لهالمستلم",
-    "new_device_for_sender": "جهاز جديد",
-    "new_city_for_sender": "مدينة جديدة",
-    "receiver_age_days": "عمر حساب المستلم (أيام)",
-    "receiver_unique_senders": "عدد الأشخاص اللي دفعوا للمستلم",
-    "receiver_senders_per_day": "سرعة تجميع المستلم لدافعين جدد",
-    "receiver_tx_24h": "عمليات المستلم آخر 24 ساعة",
-    "amount_vs_receiver_avg": "المبلغ مقارنة بمعدل المستلم",
-}
-
 _DAY = np.int64(24 * 3600 * 10**9)
 
 

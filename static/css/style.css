@@ -29,6 +29,9 @@ a { color: var(--accent); }
 .brand h1 { font-size: 1.3rem; margin: 0; letter-spacing: .5px; }
 .brand small { color: var(--muted); }
 .logo { font-size: 1.8rem; color: var(--accent); }
+.top-right { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.lang-switch { display: inline-flex; align-items: center; gap: .3rem; }
+.lang-switch select { padding: .35rem .5rem; }
 .dataset { background: var(--panel2); border: 1px solid var(--border); padding: .35rem .7rem; border-radius: 99px; font-size: .85rem; }
 
 .tabs { display: flex; gap: .3rem; padding: .5rem 1rem; background: var(--panel); border-bottom: 1px solid var(--border);
@@ -44,7 +47,7 @@ main { padding: 1rem; max-width: 1400px; margin: 0 auto; }
 .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .span2 { grid-column: span 2; }
 .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 1rem; }
-.grid .card { margin-bottom: 0; }
+.grid .card { margin-bottom: 0; min-width: 0; }
 canvas { max-width: 100%; }
 .chart-box { position: relative; height: 300px; }
 .chart-box.tall { height: 440px; }
@@ -74,11 +77,12 @@ input[type=number] { width: 7rem; }
 .check { display: flex; gap: .5rem; align-items: center; cursor: pointer; }
 .preview { margin: .5rem 0; } .preview summary { cursor: pointer; color: var(--muted); }
 
-.schema table td:first-child { font-family: monospace; direction: ltr; text-align: left; }
+.schema table td:first-child { font-family: monospace; unicode-bidi: plaintext; }
 
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: .8rem; margin-bottom: 1rem; }
 .kpi { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: .9rem; }
-.kpi .v { font-size: 1.6rem; font-weight: 700; margin-top: .2rem; direction: ltr; text-align: right; }
+.kpi .v { font-size: 1.6rem; font-weight: 700; margin-top: .2rem; }
+.kpi .v.small { font-size: 1rem; }
 .kpi .l { color: var(--muted); font-size: .85rem; }
 .kpi.bad .v { color: var(--fraud); } .kpi.warn .v { color: var(--scam); } .kpi.good .v { color: var(--ordinary); }
 .threshold label { display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; }
@@ -89,10 +93,10 @@ input[type=number] { width: 7rem; }
 .table-wrap { overflow: auto; max-width: 100%; }
 .table-wrap.tall { max-height: 480px; }
 table.data { width: 100%; border-collapse: collapse; font-size: .88rem; }
-table.data th, table.data td { padding: .5rem .55rem; border-bottom: 1px solid var(--border); text-align: right; white-space: nowrap; }
+table.data th, table.data td { padding: .5rem .55rem; border-bottom: 1px solid var(--border); text-align: start; white-space: nowrap; }
 table.data th { color: var(--muted); font-weight: 500; position: sticky; top: 0; background: var(--panel); }
 table.data tr.click { cursor: pointer; } table.data tr.click:hover { background: var(--panel2); }
-td.num { direction: ltr; text-align: left; font-variant-numeric: tabular-nums; }
+td.num { unicode-bidi: plaintext; text-align: start; font-variant-numeric: tabular-nums; }
 td.reasons { white-space: normal; min-width: 180px; color: var(--muted); font-size: .82rem; }
 .tag { display: inline-block; padding: .1rem .5rem; border-radius: 99px; font-size: .78rem; font-weight: 600; }
 .tag.ordinary, .tag.low { background: rgba(63,182,139,.15); color: var(--ordinary); }
@@ -117,7 +121,7 @@ td.reasons { white-space: normal; min-width: 180px; color: var(--muted); font-si
 .entity-head { display: flex; justify-content: space-between; align-items: start; gap: 1rem; flex-wrap: wrap; }
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: .5rem; margin: .7rem 0; }
 .stats div { background: var(--panel2); border-radius: 8px; padding: .5rem; }
-.stats b { display: block; font-size: 1.1rem; direction: ltr; text-align: right; }
+.stats b { display: block; font-size: 1.1rem; }
 .stats small { color: var(--muted); }
 .role { padding: .5rem .7rem; border-radius: 8px; background: rgba(255,77,79,.12); color: var(--fraud); margin: .4rem 0; }
 
@@ -135,7 +139,7 @@ td.reasons { white-space: normal; min-width: 180px; color: var(--muted); font-si
 
 @media (max-width: 800px) {
   main { padding: .6rem; }
-  .grid.two { grid-template-columns: 1fr; }
+  .grid.two { grid-template-columns: minmax(0, 1fr); }
   .span2 { grid-column: auto; }
   #graph { height: 420px; }
   .chart-box { height: 260px; }

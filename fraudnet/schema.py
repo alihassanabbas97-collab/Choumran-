@@ -1,42 +1,49 @@
 """Input schema, column auto-detection and normalisation of uploaded data."""
 from __future__ import annotations
 
+import unicodedata
+
 import pandas as pd
 
 LABELS = ["ordinary", "fraud", "scam"]
-LABEL_AR = {"ordinary": "عادية", "fraud": "احتيال", "scam": "نصب"}
-
-# canonical column -> (required?, Arabic description, aliases)
-COLUMNS: dict[str, tuple[bool, str, list[str]]] = {
-    "transaction_id": (False, "رقم العملية", ["id", "txn_id", "tx_id", "reference", "ref", "رقم العملية"]),
-    "timestamp": (True, "التاريخ والوقت", ["date", "datetime", "time", "created_at", "transaction_date", "التاريخ", "الوقت"]),
-    "sender_id": (True, "رقم المرسل (الشخص)", ["customer_id", "client_id", "account_id", "from_id", "payer_id", "user_id", "رقم المرسل"]),
-    "sender_name": (False, "اسم المرسل", ["customer_name", "client_name", "from_name", "payer_name", "name", "اسم المرسل", "الاسم"]),
-    "receiver_id": (True, "رقم المستلم (محل أو شخص)", ["merchant_id", "shop_id", "store_id", "to_id", "payee_id", "beneficiary_id", "رقم المستلم", "رقم المحل"]),
-    "receiver_name": (False, "اسم المستلم", ["merchant_name", "shop_name", "store_name", "to_name", "payee_name", "beneficiary", "اسم المستلم", "اسم المحل"]),
-    "receiver_type": (False, "نوع المستلم (shop/person)", ["merchant_type", "payee_type", "to_type", "نوع المستلم"]),
-    "amount": (True, "المبلغ", ["value", "amt", "total", "sum", "المبلغ", "القيمة"]),
-    "device_id": (False, "رقم الجهاز", ["device", "device_fingerprint", "terminal_id", "الجهاز"]),
-    "city": (False, "المدينة / الموقع", ["location", "country", "region", "المدينة", "الموقع"]),
-    "label": (False, "التصنيف المعروف (اختياري للتدريب)", ["class", "is_fraud", "fraud", "target", "category", "التصنيف"]),
+# canonical column -> (required?, aliases). Human labels live in static/i18n ("col.<name>").
+COLUMNS: dict[str, tuple[bool, list[str]]] = {
+    "transaction_id": (False, ["id", "txn_id", "tx_id", "reference", "ref", "رقم العملية", "numero", "reference_transaction"]),
+    "timestamp": (True, ["date", "datetime", "time", "created_at", "transaction_date", "التاريخ", "الوقت", "date_heure", "heure"]),
+    "sender_id": (True, ["customer_id", "client_id", "account_id", "from_id", "payer_id", "user_id", "رقم المرسل", "id_client", "emetteur_id", "id_emetteur"]),
+    "sender_name": (False, ["customer_name", "client_name", "from_name", "payer_name", "name", "اسم المرسل", "الاسم", "nom_client", "nom_emetteur", "nom"]),
+    "receiver_id": (True, ["merchant_id", "shop_id", "store_id", "to_id", "payee_id", "beneficiary_id", "رقم المستلم", "رقم المحل", "id_commercant", "beneficiaire_id", "id_beneficiaire"]),
+    "receiver_name": (False, ["merchant_name", "shop_name", "store_name", "to_name", "payee_name", "beneficiary", "اسم المستلم", "اسم المحل", "nom_commercant", "beneficiaire", "nom_beneficiaire"]),
+    "receiver_type": (False, ["merchant_type", "payee_type", "to_type", "نوع المستلم", "type_beneficiaire"]),
+    "amount": (True, ["value", "amt", "total", "sum", "المبلغ", "القيمة", "montant", "valeur"]),
+    "device_id": (False, ["device", "device_fingerprint", "terminal_id", "الجهاز", "appareil"]),
+    "city": (False, ["location", "country", "region", "المدينة", "الموقع", "ville", "lieu", "pays"]),
+    "label": (False, ["class", "is_fraud", "fraud", "target", "category", "التصنيف", "classe", "etiquette"]),
 }
 
 LABEL_ALIASES = {
     "ordinary": "ordinary", "normal": "ordinary", "legit": "ordinary", "legitimate": "ordinary",
     "genuine": "ordinary", "ok": "ordinary", "0": "ordinary", "false": "ordinary", "no": "ordinary",
-    "عادية": "ordinary", "عادي": "ordinary", "سليمة": "ordinary",
+    "عادية": "ordinary", "عادي": "ordinary", "سليمة": "ordinary", "normale": "ordinary",
     "fraud": "fraud", "fraudulent": "fraud", "1": "fraud", "true": "fraud", "yes": "fraud",
-    "احتيال": "fraud",
-    "scam": "scam", "scamming": "scam", "نصب": "scam", "2": "scam",
+    "احتيال": "fraud", "fraude": "fraud",
+    "scam": "scam", "scamming": "scam", "نصب": "scam", "2": "scam", "arnaque": "scam", "escroquerie": "scam",
 }
 
 
 class SchemaError(ValueError):
-    pass
+    """User-facing error; ``code`` is an i18n key suffix (``err.<code>``)."""
+
+    def __init__(self, code: str, **params):
+        self.code = code
+        self.params = params
+        super().__init__(f"{code}: {params}" if params else code)
 
 
 def _norm(name: str) -> str:
-    return str(name).strip().lower().replace(" ", "_").replace("-", "_")
+    s = unicodedata.normalize("NFKD", str(name).strip().lower())
+    s = "".join(ch for ch in s if not unicodedata.combining(ch) or "\u0600" <= ch <= "\u06ff")
+    return s.replace(" ", "_").replace("-", "_")
 
 
 def guess_mapping(columns: list[str]) -> dict[str, str | None]:
@@ -44,7 +51,7 @@ def guess_mapping(columns: list[str]) -> dict[str, str | None]:
     normed = {_norm(c): c for c in columns}
     mapping: dict[str, str | None] = {}
     taken: set[str] = set()
-    for canon, (_, _, aliases) in COLUMNS.items():
+    for canon, (_, aliases) in COLUMNS.items():
         found = None
         for cand in [canon, *aliases]:
             c = normed.get(_norm(cand))
@@ -59,12 +66,12 @@ def guess_mapping(columns: list[str]) -> dict[str, str | None]:
 
 def normalise(raw: pd.DataFrame, mapping: dict[str, str | None]) -> pd.DataFrame:
     """Rename/clean an uploaded frame into the canonical schema."""
-    missing = [c for c, (req, _, _) in COLUMNS.items() if req and not mapping.get(c)]
+    missing = [c for c, (req, _) in COLUMNS.items() if req and not mapping.get(c)]
     if missing:
-        raise SchemaError("أعمدة ناقصة: " + "، ".join(COLUMNS[c][1] for c in missing))
+        raise SchemaError("missing_columns", cols=missing)
     for canon, src in mapping.items():
         if src and src not in raw.columns:
-            raise SchemaError(f"العمود '{src}' غير موجود في الملف")
+            raise SchemaError("column_not_found", col=src)
 
     df = pd.DataFrame({canon: raw[src] for canon, src in mapping.items() if src})
 
@@ -75,7 +82,7 @@ def normalise(raw: pd.DataFrame, mapping: dict[str, str | None]) -> pd.DataFrame
     )
     bad = df["timestamp"].isna() | df["amount"].isna()
     if bad.all():
-        raise SchemaError("ما قدرنا نقرأ التاريخ أو المبلغ في أي سطر. تأكد من اختيار الأعمدة الصحيحة.")
+        raise SchemaError("unreadable_values")
     df = df[~bad].copy()
 
     for c in ("sender_id", "receiver_id"):
@@ -92,7 +99,7 @@ def normalise(raw: pd.DataFrame, mapping: dict[str, str | None]) -> pd.DataFrame
 
     if "receiver_type" in df:
         t = df["receiver_type"].astype(str).str.strip().str.lower()
-        df["receiver_type"] = t.map(lambda v: "person" if v in ("person", "p2p", "individual", "شخص") else "shop")
+        df["receiver_type"] = t.map(lambda v: "person" if v in ("person", "p2p", "individual", "شخص", "personne", "particulier") else "shop")
     else:
         # a receiver that also sends money is a person, otherwise treat as shop
         senders = set(df["sender_id"])
@@ -102,8 +109,7 @@ def normalise(raw: pd.DataFrame, mapping: dict[str, str | None]) -> pd.DataFrame
         lab = df["label"].astype(str).str.strip().str.lower().map(LABEL_ALIASES)
         unknown = df.loc[lab.isna(), "label"].astype(str).unique()[:5]
         if len(unknown) and lab.notna().any():
-            raise SchemaError("قيم تصنيف غير معروفة: " + "، ".join(unknown)
-                              + " (المسموح: ordinary / fraud / scam)")
+            raise SchemaError("unknown_labels", values=", ".join(unknown))
         if lab.isna().all():
             df = df.drop(columns="label")
         else:

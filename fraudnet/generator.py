@@ -18,35 +18,94 @@ from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
 
-FIRST_NAMES = [
-    "محمد", "علي", "حسن", "حسين", "أحمد", "خالد", "عمر", "يوسف", "جورج", "إيلي",
-    "شربل", "طوني", "رامي", "سامر", "وسيم", "كريم", "زياد", "فادي", "نادر", "بلال",
-    "فاطمة", "زينب", "مريم", "رنا", "نور", "لينا", "ريم", "سارة", "ماريا", "كارلا",
-    "جنى", "هبة", "دانة", "ليال", "رشا", "سلمى", "نادين", "ريتا", "منى", "هالة",
+# Name tables per locale. Lists are index-aligned (same length) so that the
+# same seed produces the same data in every language, only the names differ.
+_LATIN_FIRST = [
+    "Mohammad", "Ali", "Hassan", "Hussein", "Ahmad", "Khaled", "Omar", "Youssef", "George", "Elie",
+    "Charbel", "Tony", "Rami", "Samer", "Wassim", "Karim", "Ziad", "Fadi", "Nader", "Bilal",
+    "Fatima", "Zeinab", "Maryam", "Rana", "Nour", "Lina", "Reem", "Sara", "Maria", "Carla",
+    "Jana", "Hiba", "Dana", "Layal", "Rasha", "Salma", "Nadine", "Rita", "Mona", "Hala",
 ]
-LAST_NAMES = [
-    "حداد", "خوري", "الحسيني", "عيسى", "منصور", "شمعون", "نصرالله", "الأسمر",
-    "فرحات", "عبود", "سليمان", "قاسم", "يزبك", "الحاج", "جابر", "عطية", "زعيتر",
-    "غانم", "صعب", "بدران", "مراد", "طعمة", "حمادة", "سعادة", "الخطيب",
+_LATIN_LAST = [
+    "Haddad", "Khoury", "Husseini", "Issa", "Mansour", "Chamoun", "Nasrallah", "Asmar",
+    "Farhat", "Abboud", "Sleiman", "Kassem", "Yazbek", "Hajj", "Jaber", "Attieh", "Zeaiter",
+    "Ghanem", "Saab", "Badran", "Mourad", "Tohme", "Hamadeh", "Saadeh", "Khatib",
 ]
-CITIES = ["بيروت", "طرابلس", "صيدا", "جونية", "زحلة", "صور", "جبيل", "عجلتون", "النبطية", "بعلبك"]
-FOREIGN_CITIES = ["إسطنبول", "دبي", "لاغوس", "كييف", "مجهول"]
-
-# category -> (name templates, log-normal mean, sigma)
-SHOP_CATEGORIES = {
-    "سوبرماركت": (["سوبرماركت {}", "ميني ماركت {}"], 3.4, 0.6),
-    "مطعم": (["مطعم {}", "سناك {}"], 3.0, 0.5),
-    "صيدلية": (["صيدلية {}"], 3.1, 0.6),
-    "محطة وقود": (["محطة {}"], 3.6, 0.4),
-    "ملابس": (["بوتيك {}", "أزياء {}"], 4.0, 0.6),
-    "إلكترونيات": (["إلكترونيات {}", "موبايلات {}"], 5.2, 0.7),
-    "مجوهرات": (["مجوهرات {}"], 5.8, 0.7),
+FIRST_NAMES = {
+    "ar": [
+        "محمد", "علي", "حسن", "حسين", "أحمد", "خالد", "عمر", "يوسف", "جورج", "إيلي",
+        "شربل", "طوني", "رامي", "سامر", "وسيم", "كريم", "زياد", "فادي", "نادر", "بلال",
+        "فاطمة", "زينب", "مريم", "رنا", "نور", "لينا", "ريم", "سارة", "ماريا", "كارلا",
+        "جنى", "هبة", "دانة", "ليال", "رشا", "سلمى", "نادين", "ريتا", "منى", "هالة",
+    ],
+    "en": _LATIN_FIRST,
+    "fr": _LATIN_FIRST,
 }
-SHOP_WORDS = ["الأرز", "النخيل", "الشمس", "الجبل", "البحر", "السلام", "الأمل", "الوادي",
-              "النور", "الربيع", "الياسمين", "الضيعة", "المدينة", "القلعة", "الزيتون"]
-HIGH_VALUE = ("إلكترونيات", "مجوهرات")
-SCAM_SHOP_NAMES = ["متجر العروض الذهبية", "استثمار سريع أونلاين", "جوائز فورية",
-                   "شحن دولي سريع", "تذاكر بأسعار خيالية", "ربح من المنزل"]
+LAST_NAMES = {
+    "ar": [
+        "حداد", "خوري", "الحسيني", "عيسى", "منصور", "شمعون", "نصرالله", "الأسمر",
+        "فرحات", "عبود", "سليمان", "قاسم", "يزبك", "الحاج", "جابر", "عطية", "زعيتر",
+        "غانم", "صعب", "بدران", "مراد", "طعمة", "حمادة", "سعادة", "الخطيب",
+    ],
+    "en": _LATIN_LAST,
+    "fr": _LATIN_LAST,
+}
+CITIES = {
+    "ar": ["بيروت", "طرابلس", "صيدا", "جونية", "زحلة", "صور", "جبيل", "عجلتون", "النبطية", "بعلبك"],
+    "en": ["Beirut", "Tripoli", "Sidon", "Jounieh", "Zahle", "Tyre", "Byblos", "Ajaltoun", "Nabatieh", "Baalbek"],
+    "fr": ["Beyrouth", "Tripoli", "Saïda", "Jounieh", "Zahlé", "Tyr", "Byblos", "Ajaltoun", "Nabatieh", "Baalbek"],
+}
+FOREIGN_CITIES = {
+    "ar": ["إسطنبول", "دبي", "لاغوس", "كييف", "مجهول"],
+    "en": ["Istanbul", "Dubai", "Lagos", "Kyiv", "Unknown"],
+    "fr": ["Istanbul", "Dubaï", "Lagos", "Kiev", "Inconnu"],
+}
+
+# category -> (log-normal mean, sigma); name templates per locale
+SHOP_CATEGORIES = {
+    "supermarket": (3.4, 0.6),
+    "restaurant": (3.0, 0.5),
+    "pharmacy": (3.1, 0.6),
+    "fuel": (3.6, 0.4),
+    "clothing": (4.0, 0.6),
+    "electronics": (5.2, 0.7),
+    "jewelry": (5.8, 0.7),
+}
+SHOP_TEMPLATES = {
+    "ar": {
+        "supermarket": ["سوبرماركت {}", "ميني ماركت {}"], "restaurant": ["مطعم {}", "سناك {}"],
+        "pharmacy": ["صيدلية {}"], "fuel": ["محطة {}"], "clothing": ["بوتيك {}", "أزياء {}"],
+        "electronics": ["إلكترونيات {}", "موبايلات {}"], "jewelry": ["مجوهرات {}"],
+    },
+    "en": {
+        "supermarket": ["{} Supermarket", "{} Mini Market"], "restaurant": ["{} Restaurant", "{} Snack"],
+        "pharmacy": ["{} Pharmacy"], "fuel": ["{} Gas Station"], "clothing": ["{} Boutique", "{} Fashion"],
+        "electronics": ["{} Electronics", "{} Mobiles"], "jewelry": ["{} Jewelry"],
+    },
+    "fr": {
+        "supermarket": ["Supermarché {}", "Supérette {}"], "restaurant": ["Restaurant {}", "Snack {}"],
+        "pharmacy": ["Pharmacie {}"], "fuel": ["Station {}"], "clothing": ["Boutique {}", "Mode {}"],
+        "electronics": ["Électronique {}", "Mobiles {}"], "jewelry": ["Bijouterie {}"],
+    },
+}
+SHOP_WORDS = {
+    "ar": ["الأرز", "النخيل", "الشمس", "الجبل", "البحر", "السلام", "الأمل", "الوادي",
+           "النور", "الربيع", "الياسمين", "الضيعة", "المدينة", "القلعة", "الزيتون"],
+    "en": ["Cedar", "Palm", "Sun", "Mountain", "Sea", "Peace", "Hope", "Valley",
+           "Light", "Spring", "Jasmine", "Village", "City", "Castle", "Olive"],
+    "fr": ["du Cèdre", "des Palmiers", "du Soleil", "de la Montagne", "de la Mer", "de la Paix", "de l'Espoir", "de la Vallée",
+           "de la Lumière", "du Printemps", "du Jasmin", "du Village", "de la Ville", "du Château", "de l'Olivier"],
+}
+HIGH_VALUE = ("electronics", "jewelry")
+SCAM_SHOP_NAMES = {
+    "ar": ["متجر العروض الذهبية", "استثمار سريع أونلاين", "جوائز فورية",
+           "شحن دولي سريع", "تذاكر بأسعار خيالية", "ربح من المنزل"],
+    "en": ["Golden Deals Store", "Fast Online Investment", "Instant Prizes",
+           "Express Global Shipping", "Unbelievable Ticket Prices", "Earn From Home"],
+    "fr": ["Boutique Offres en Or", "Investissement Rapide en Ligne", "Gains Instantanés",
+           "Livraison Internationale Express", "Billets à Prix Incroyables", "Gagner depuis Chez Soi"],
+}
+LOCALES = ("en", "ar", "fr")
 
 
 def generate_transactions(
@@ -56,10 +115,15 @@ def generate_transactions(
     fraud_cases: int = 25,
     scam_receivers: int = 5,
     seed: int | None = 42,
+    locale: str = "en",
     start: datetime | None = None,
 ) -> pd.DataFrame:
     """Return a DataFrame of synthetic transactions with a ``label`` column."""
     rng = np.random.default_rng(seed)
+    locale = locale if locale in LOCALES else "en"
+    first_names, last_names = FIRST_NAMES[locale], LAST_NAMES[locale]
+    cities, foreign = CITIES[locale], FOREIGN_CITIES[locale]
+    templates_l, words = SHOP_TEMPLATES[locale], SHOP_WORDS[locale]
     start = start or datetime(2026, 1, 1)
 
     # ---- entities -------------------------------------------------------
@@ -67,14 +131,14 @@ def generate_transactions(
     used_names: set[str] = set()
     for i in range(n_persons):
         while True:
-            name = f"{rng.choice(FIRST_NAMES)} {rng.choice(LAST_NAMES)}"
-            if name not in used_names or len(used_names) >= len(FIRST_NAMES) * len(LAST_NAMES):
+            name = f"{rng.choice(first_names)} {rng.choice(last_names)}"
+            if name not in used_names or len(used_names) >= len(first_names) * len(last_names):
                 break
         used_names.add(name)
         persons.append({
             "id": f"P{i + 1:04d}",
             "name": name,
-            "city": rng.choice(CITIES),
+            "city": rng.choice(cities),
             "device": f"D{rng.integers(10**6, 10**7)}",
             "activity": rng.uniform(0.4, 2.0),  # tx per day
         })
@@ -84,12 +148,12 @@ def generate_transactions(
     weights = np.array([0.25, 0.2, 0.12, 0.15, 0.13, 0.09, 0.06])
     for i in range(n_shops):
         cat = rng.choice(cats, p=weights / weights.sum())
-        templates, mu, sigma = SHOP_CATEGORIES[cat]
-        name = rng.choice(templates).format(rng.choice(SHOP_WORDS))
+        mu, sigma = SHOP_CATEGORIES[cat]
+        name = rng.choice(templates_l[cat]).format(rng.choice(words))
         if any(s["name"] == name for s in shops):
             name = f"{name} {i + 1}"
         shops.append({"id": f"S{i + 1:03d}", "name": name, "category": cat,
-                      "city": rng.choice(CITIES), "mu": mu, "sigma": sigma})
+                      "city": rng.choice(cities), "mu": mu, "sigma": sigma})
     shop_by_cat = {c: [s for s in shops if s["category"] == c] for c in cats}
 
     for p in persons:
@@ -128,7 +192,7 @@ def generate_transactions(
             day = int(rng.integers(0, days))
             ts = day_time(day)
             device = p["device"] if rng.random() > 0.02 else f"D{rng.integers(10**6, 10**7)}"
-            city = p["city"] if rng.random() > 0.1 else rng.choice(CITIES)
+            city = p["city"] if rng.random() > 0.1 else rng.choice(cities)
             r = rng.random()
             if r < 0.1:  # peer-to-peer to a friend
                 friend = persons[int(rng.choice(p["friends"]))]
@@ -153,7 +217,7 @@ def generate_transactions(
         day = int(rng.integers(5, days))
         ts = day_time(day, night=rng.random() < 0.8)
         device = f"D{rng.integers(10**6, 10**7)}"
-        city = rng.choice(FOREIGN_CITIES) if rng.random() < 0.6 else rng.choice(CITIES)
+        city = rng.choice(foreign) if rng.random() < 0.6 else rng.choice(cities)
         for _ in range(int(rng.integers(3, 9))):
             pool = [s for c in HIGH_VALUE for s in shop_by_cat[c]] or shops
             unfamiliar = [s for s in pool if shops.index(s) not in p["favorites"]] or pool
@@ -166,10 +230,10 @@ def generate_transactions(
     for i in range(scam_receivers):
         is_shop = rng.random() < 0.6
         if is_shop:
-            receiver = {"id": f"S{n_shops + i + 1:03d}", "name": SCAM_SHOP_NAMES[i % len(SCAM_SHOP_NAMES)]}
+            receiver = {"id": f"S{n_shops + i + 1:03d}", "name": SCAM_SHOP_NAMES[locale][i % len(SCAM_SHOP_NAMES[locale])]}
         else:
             receiver = {"id": f"P{n_persons + i + 1:04d}",
-                        "name": f"{rng.choice(FIRST_NAMES)} {rng.choice(LAST_NAMES)}"}
+                        "name": f"{rng.choice(first_names)} {rng.choice(last_names)}"}
         first_day = int(rng.integers(days // 4, days - 10))
         span = int(rng.integers(4, 10))
         n_victims = int(rng.integers(12, 30))

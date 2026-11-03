@@ -12,6 +12,7 @@ from flask import Flask, Response, jsonify, render_template, request
 
 from fraudnet import analysis as an
 from fraudnet.generator import generate_transactions
+from fraudnet.i18n import norm_lang, t
 from fraudnet.model import default_model, train
 from fraudnet.schema import COLUMNS, SchemaError, guess_mapping, normalise
 
@@ -35,6 +36,16 @@ def _remember(store: OrderedDict, value) -> str:
     return key
 
 
+def _lang() -> str:
+    return norm_lang(request.args.get("lang") or request.headers.get("X-Lang"))
+
+
+def _err(code: str, status: int, **params):
+    if "cols" in params:  # list of canonical column names -> translated labels
+        params["cols"] = ", ".join(t(_lang(), f"col.{c}") for c in params["cols"])
+    return jsonify(error=t(_lang(), f"err.{code}", **params), code=code), status
+
+
 def _get_analysis(aid: str) -> an.Analysis:
     a = _analyses.get(aid)
     if a is None:
@@ -44,44 +55,44 @@ def _get_analysis(aid: str) -> an.Analysis:
 
 @app.errorhandler(KeyError)
 def _missing(_e):
-    return jsonify(error="التحليل غير موجود أو انتهت صلاحيته. ارفع الملف من جديد."), 404
+    return _err("not_found", 404)
 
 
 @app.errorhandler(SchemaError)
 def _schema(e):
-    return jsonify(error=str(e)), 400
+    return _err(e.code, 400, **e.params)
 
 
 @app.errorhandler(413)
 def _too_big(_e):
-    return jsonify(error="الملف كبير كتير"), 413
+    return _err("too_big", 413)
 
 
 def _read_table(file) -> pd.DataFrame:
     name = (file.filename or "").lower()
     data = file.read()
     if not data:
-        raise SchemaError("الملف فاضي")
+        raise SchemaError("empty_file")
     if name.endswith((".xlsx", ".xls")):
         try:
             return pd.read_excel(io.BytesIO(data))
         except ImportError as e:
-            raise SchemaError("قراءة ملفات Excel بدها مكتبة openpyxl") from e
+            raise SchemaError("excel_lib") from e
     for enc in ("utf-8-sig", "cp1256", "latin-1"):
         try:
             return pd.read_csv(io.BytesIO(data), encoding=enc, sep=None, engine="python")
         except UnicodeDecodeError:
             continue
         except Exception as e:  # parser errors
-            raise SchemaError(f"ما قدرنا نقرأ الملف: {e}") from e
-    raise SchemaError("ترميز الملف غير معروف")
+            raise SchemaError("parse_error", detail=str(e)[:200]) from e
+    raise SchemaError("encoding")
 
 
 def _finish(df: pd.DataFrame, meta: dict, do_train: bool, threshold: float, use_custom: bool):
     model = default_model()
     if do_train:
         if "label" not in df:
-            raise SchemaError("للتدريب لازم تختار عمود التصنيف (label)")
+            raise SchemaError("train_needs_label")
         model = train(df, source="uploaded")
         _custom_model["model"] = model
     elif use_custom and _custom_model["model"] is not None:
@@ -112,7 +123,7 @@ def index():
 @app.get("/api/schema")
 def api_schema():
     return jsonify(
-        columns=[{"name": k, "required": v[0], "label": v[1]} for k, v in COLUMNS.items()],
+        columns=[{"name": k, "required": v[0]} for k, v in COLUMNS.items()],
         has_custom_model=_custom_model["model"] is not None,
     )
 
@@ -126,15 +137,16 @@ def api_demo():
     seed = int(seed) if seed not in (None, "") else None
     raw = generate_transactions(n_persons=n_persons, n_shops=max(10, n_persons // 5), days=days,
                                 fraud_cases=max(3, n_persons // 12), scam_receivers=max(2, n_persons // 60),
-                                seed=seed)
+                                seed=seed, locale=_lang())
     df = normalise(raw, guess_mapping(list(raw.columns)))
-    meta = {"source": "demo", "name": f"بيانات تجريبية ({n_persons} شخص، {days} يوم)", "rows": len(df)}
+    meta = {"source": "demo", "persons": n_persons, "days": days, "rows": len(df)}
     return _finish(df, meta, do_train=False, threshold=_threshold(), use_custom=False)
 
 
 @app.get("/api/sample.csv")
 def api_sample():
-    raw = generate_transactions(n_persons=120, n_shops=25, days=30, fraud_cases=10, scam_receivers=2, seed=11)
+    raw = generate_transactions(n_persons=120, n_shops=25, days=30, fraud_cases=10, scam_receivers=2, seed=11,
+                                locale=_lang())
     return Response(raw.to_csv(index=False).encode("utf-8-sig"), mimetype="text/csv",
                     headers={"Content-Disposition": "attachment; filename=sample_transactions.csv"})
 
@@ -143,10 +155,10 @@ def api_sample():
 def api_upload():
     file = request.files.get("file")
     if file is None:
-        raise SchemaError("ما في ملف")
+        raise SchemaError("no_file")
     raw = _read_table(file)
     if raw.empty:
-        raise SchemaError("الملف ما فيه ولا سطر")
+        raise SchemaError("no_rows")
     raw.columns = [str(c).strip() for c in raw.columns]
     token = _remember(_pending, raw)
     preview = raw.head(5).astype(object).where(raw.head(5).notna(), None)
@@ -165,7 +177,7 @@ def api_analyze():
         raise KeyError("token")
     mapping = {k: (v or None) for k, v in (body.get("mapping") or {}).items() if k in COLUMNS}
     df = normalise(raw, mapping)
-    meta = {"source": "upload", "name": body.get("filename") or "ملف مرفوع", "rows": len(df),
+    meta = {"source": "upload", "name": body.get("filename") or "", "rows": len(df),
             "dropped_rows": int(len(raw) - len(df))}
     return _finish(df, meta, do_train=bool(body.get("train")), threshold=_threshold(),
                    use_custom=bool(body.get("use_custom")))
@@ -237,11 +249,20 @@ def api_graph(aid):
 @app.get("/api/a/<aid>/export.csv")
 def api_export(aid):
     a = _get_analysis(aid)
+    lang = _lang()
     what = request.args.get("what", "transactions")
     if what == "entities":
         data = a.entities.reset_index()
+        data["type"] = data["type"].map(lambda v: t(lang, f"type.{v}"))
+        data["risk_level"] = data["risk_level"].map(lambda v: t(lang, f"level.{v}"))
+        data["role"] = data["role"].map(lambda v: t(lang, f"role.{v}") if v else "")
     else:
         data = pd.DataFrame(an.tx_records(a.df))
+        for col in ("predicted", "label"):
+            if col in data:
+                data[col] = data[col].map(lambda v: t(lang, f"label.{v}") if v else "")
+        data["receiver_type"] = data["receiver_type"].map(lambda v: t(lang, f"type.{v}"))
+        data["reasons"] = data["reasons"].map(lambda rs: "; ".join(t(lang, f"reason.{r}") for r in rs))
     return Response(data.to_csv(index=False).encode("utf-8-sig"), mimetype="text/csv",
                     headers={"Content-Disposition": f"attachment; filename=choumran_{what}.csv"})
 
