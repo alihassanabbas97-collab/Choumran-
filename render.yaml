@@ -1,0 +1,24 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# In Render: New -> Blueprint -> pick this repository. You will be asked for APP_PASSWORD.
+services:
+  - type: web
+    name: choumran
+    runtime: python
+    plan: free
+    # Install dependencies and pre-train the default model so startup is fast.
+    buildCommand: pip install -r requirements.txt && python -m fraudnet.model
+    # One worker only: analyses are kept in this process's memory.
+    startCommand: gunicorn app:app --workers 1 --threads 4 --timeout 180 --bind 0.0.0.0:$PORT
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: APP_PASSWORD
+        sync: false          # Render asks you for the value; never commit it
+      - key: MAX_UPLOAD_MB
+        value: "20"
+      - key: MAX_ANALYSES
+        value: "3"
+      - key: PRELOAD_MODEL       # warm the model up as soon as the server starts
+        value: "1"

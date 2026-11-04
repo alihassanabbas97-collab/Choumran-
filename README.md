@@ -40,6 +40,37 @@ On the first run the default model trains on synthetic data. This takes about 15
 
 To open the app from a phone on the same Wi-Fi network, run `HOST=0.0.0.0 python app.py` and visit `http://<computer-ip>:5000`.
 
+## Putting it online (Render)
+
+The repository includes a `render.yaml`, so deploying takes a few taps, even from a phone:
+
+1. Create an account at [render.com](https://render.com) and sign in with GitHub.
+2. Choose **New → Blueprint** and pick this repository.
+3. When Render asks for **`APP_PASSWORD`**, enter a password of your choice.
+4. Click **Apply**. After a few minutes you get a link like `https://choumran.onrender.com`.
+5. Open the link. When the browser asks for a login, type any username and the password from step 3.
+
+Every merge into `main` redeploys the site automatically.
+
+Things to know about the free plan:
+
+- The site goes to sleep when nobody uses it. The first visit after that takes about a minute.
+- Analyses live in memory, so they are cleared whenever the server sleeps or redeploys.
+- The model is trained during the build. It doesn't slow down the first visit.
+
+**Privacy:** online, your data passes through Render's servers. Always keep `APP_PASSWORD` set, and only upload real data if you're comfortable with that.
+
+### Settings (environment variables)
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `APP_PASSWORD` | *(empty = no password)* | Password for the whole site |
+| `MAX_UPLOAD_MB` | `50` | Largest file you can upload |
+| `MAX_ANALYSES` | `8` | How many analyses are kept in memory |
+| `PRELOAD_MODEL` | — | `1` = load the model as soon as the server starts |
+
+The app keeps analyses in memory, so it must run as **one process** (`gunicorn --workers 1`), as configured in `render.yaml`.
+
 ## File format
 
 | Column | Meaning | |
@@ -81,4 +112,5 @@ fraudnet/i18n.py       server-side translations
 static/i18n/           translation files (en / ar / fr)
 templates/, static/    interface (mobile-friendly, LTR + RTL)
 tests/                 tests: python -m pytest
+render.yaml            deployment config for Render
 ```

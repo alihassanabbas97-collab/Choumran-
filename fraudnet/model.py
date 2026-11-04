@@ -120,3 +120,16 @@ def default_model() -> TrainedModel:
                 MODEL_DIR.mkdir(exist_ok=True)
                 joblib.dump(_default, DEFAULT_MODEL_PATH)
         return _default
+
+
+if __name__ == "__main__":  # pragma: no cover
+    # Pre-train the default model (used at build time when deploying).
+    import time
+
+    started = time.time()
+    if DEFAULT_MODEL_PATH.exists():
+        DEFAULT_MODEL_PATH.unlink()
+    m = default_model()
+    print(f"trained default model in {time.time() - started:.1f}s -> {DEFAULT_MODEL_PATH}")
+    print(f"held-out suspicious recall={m.metrics['suspicious_recall']:.3f} "
+          f"precision={m.metrics['suspicious_precision']:.3f}")

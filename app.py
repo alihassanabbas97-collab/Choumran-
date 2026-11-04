@@ -1,6 +1,7 @@
 """Choumran – money-transaction fraud & scam detection web app."""
 from __future__ import annotations
 
+import hmac
 import io
 import os
 import secrets
@@ -20,11 +21,44 @@ app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("MAX_UPLOAD_MB", "50")) * 1024 * 1024
 
 # Everything is kept in memory only: uploaded data is never written to disk.
-_MAX_KEEP = 8
+# Because of this the app must run as a single process (e.g. gunicorn --workers 1).
+_MAX_KEEP = int(os.environ.get("MAX_ANALYSES", "8"))
 _pending: OrderedDict[str, pd.DataFrame] = OrderedDict()
 _analyses: OrderedDict[str, an.Analysis] = OrderedDict()
 _custom_model = {"model": None}
 _store_lock = threading.Lock()
+
+
+# --------------------------------------------------------------- password --
+# Set APP_PASSWORD to protect the whole site (browser login prompt, any username).
+_PASSWORD = os.environ.get("APP_PASSWORD", "")
+_OPEN_PATHS = ("/healthz",)
+
+
+@app.before_request
+def _require_password():
+    if not _PASSWORD or request.path in _OPEN_PATHS:
+        return None
+    auth = request.authorization
+    given = (auth.password or "") if auth else ""
+    if hmac.compare_digest(given.encode(), _PASSWORD.encode()):
+        return None
+    return Response("Password required", 401, {"WWW-Authenticate": 'Basic realm="Choumran", charset="UTF-8"'})
+
+
+def _warm_up():
+    """Load the model and run one tiny analysis so the first real request is fast."""
+    raw = generate_transactions(n_persons=30, n_shops=10, days=14, fraud_cases=3, scam_receivers=2, seed=1)
+    an.run(normalise(raw, guess_mapping(list(raw.columns))), default_model())
+
+
+if os.environ.get("PRELOAD_MODEL") == "1":
+    threading.Thread(target=_warm_up, daemon=True).start()
+
+
+@app.get("/healthz")
+def healthz():
+    return {"ok": True}
 
 
 def _remember(store: OrderedDict, value) -> str:
@@ -268,7 +302,7 @@ def api_export(aid):
 
 
 if __name__ == "__main__":
-    # warm the model so the first request is fast
-    threading.Thread(target=default_model, daemon=True).start()
+    if os.environ.get("PRELOAD_MODEL") != "1":  # warm up so the first request is fast
+        threading.Thread(target=_warm_up, daemon=True).start()
     app.run(host=os.environ.get("HOST", "127.0.0.1"), port=int(os.environ.get("PORT", "5000")),
             debug=os.environ.get("FLASK_DEBUG") == "1")
