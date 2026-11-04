@@ -187,3 +187,23 @@ def test_export_is_translated(client):
     assert "Normale" in csv_fr
     ent_ar = client.get(f"/api/a/{aid}/export.csv?what=entities&lang=ar").data.decode("utf-8-sig")
     assert "شخص" in ent_ar
+
+
+# -------------------------------------------------------------- password --
+def test_password_protection(monkeypatch, client):
+    import base64
+
+    import app as app_module
+
+    monkeypatch.setattr(app_module, "_PASSWORD", "s3cret")
+    assert client.get("/").status_code == 401
+    assert "WWW-Authenticate" in client.get("/api/schema").headers
+    assert client.get("/healthz").status_code == 200
+    bad = base64.b64encode(b"x:wrong").decode()
+    assert client.get("/", headers={"Authorization": f"Basic {bad}"}).status_code == 401
+    good = base64.b64encode(b"anyone:s3cret").decode()
+    assert client.get("/", headers={"Authorization": f"Basic {good}"}).status_code == 200
+
+
+def test_no_password_means_open(client):
+    assert client.get("/").status_code == 200
